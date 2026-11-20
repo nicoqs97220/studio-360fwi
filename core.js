@@ -229,13 +229,15 @@ const Core = (() => {
   async function llm(messages) {
     if (settings.keys.agnes) { const d = await agnes("/v1/chat/completions", { model: "agnes-3.0-flash", messages }); return { text: cleanTxt(d.choices[0].message.content), via: "Agnes 3.0 Flash" }; }
     return lanes.pollTxt.run(async () => {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const r = await fetch("https://text.pollinations.ai/openai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }) });
         const d = await readJson(r);
         if (r.ok && d.choices) return { text: cleanTxt(d.choices[0].message.content), via: "Pollinations (gratuit, 1 réponse / 45 s)" };
-        const ra = Number(r.headers.get("retry-after")) || 0; if (r.status === 402 && ra && i < 2) { await sleep(ra * 1000 + 500); continue; }
+        const ra = Number(r.headers.get("retry-after")) || (r.status === 503 ? 10 : 0);
+        if ((r.status === 402 || r.status === 503 || r.status === 429) && ra && i < 4) { await sleep(ra * 1000 + 500); continue; }
         throw errFrom(r.status, d);
       }
+      throw new EngineError("Le service de texte gratuit est saturé. Réessaie dans une minute, ou ajoute ta clé Agnes gratuite dans Réglages.", "quota atteint");
     }, 46000);
   }
   const STOP = new Set("un une des le la les de du d l au aux et ou en dans sur sous avec pour par qui que quoi dont fait faire fais font est sont a ont il elle ils elles je tu on nous vous mon ma mes ton ta tes son sa ses ce cet cette ces se leur leurs plus très trop comme veux voudrais voir".split(" "));
