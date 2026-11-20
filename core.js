@@ -3,7 +3,7 @@
    Remplace le serveur : stockage (IndexedDB), catalogue, moteurs gratuits, lots, versions.
    Tout reste sur l'appareil ; seuls les textes et références d'un plan partent vers les moteurs choisis. */
 const Core = (() => {
-  const VERSION = "0.2.1";
+  const VERSION = "0.2.2";
   const CA = { "Client-Agent": "Studio360FWI:0.2:web" };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const now = () => new Date().toISOString();
@@ -119,6 +119,12 @@ const Core = (() => {
             for (let i = 0; i < 4; i++) {
               const r = await fetch("https://aihorde.net/api/v2/generate/async", { method: "POST", headers: { "Content-Type": "application/json", apikey: settings.keys.horde || "0000000000", ...CA }, body: JSON.stringify(body) });
               const d = await readJson(r); if (r.ok && d.id) return d.id;
+              // Compte récent sans assez de « kudos » : on repasse à la taille autorisée sans kudos.
+              if (/KudosUpfront/i.test(JSON.stringify(d)) && body.params.width * body.params.height > 360000) {
+                const q = Math.sqrt(360000 / (body.params.width * body.params.height));
+                body.params.width = Math.floor(body.params.width * q / 64) * 64; body.params.height = Math.floor(body.params.height * q / 64) * 64; body.params.steps = 20;
+                t.sent.params = { ...body.params, model }; continue;
+              }
               if ((r.status === 429 || /per 1 second|too many/i.test(JSON.stringify(d))) && i < 3) { await sleep(1500 * (i + 1)); continue; }
               throw errFrom(r.status, d);
             }

@@ -516,8 +516,10 @@ async function renderSettings() {
     <section class="box"><h2>Clés gratuites</h2><p class="sub">Les clés restent sur cet appareil (téléphone ou PC) et ne partent que vers le service concerné. Saisis-les sur chaque appareil utilisé. Laisse un champ vide pour garder la clé actuelle.</p>
       <label class="f">Clé Agnes AI ${k.agnes ? `<span class="h">enregistrée (${esc(k.agnes)})</span>` : '<span class="h">ajoute Agnes Image et Agnes Video au comparatif, et accélère les résumés</span>'}<input type="password" id="kAgnes" autocomplete="off" placeholder="sk-…"></label>
       <p class="sub">Obtenir la clé : <a href="https://platform.agnes-ai.com/" target="_blank" rel="noopener">platform.agnes-ai.com</a> → API Keys → Create.</p>
-      <label class="f">Jeton Hugging Face ${k.hf ? `<span class="h">enregistré (${esc(k.hf)})</span>` : '<span class="h">facultatif : augmente le quota GPU gratuit de FLUX</span>'}<input type="password" id="kHf" autocomplete="off" placeholder="hf_…"></label>
-      <label class="f">Clé AI Horde ${k.horde ? `<span class="h">enregistrée (${esc(k.horde)})</span>` : '<span class="h">facultatif : compte gratuit = images plus grandes et file plus rapide</span>'}<input type="password" id="kHorde" autocomplete="off"></label>
+      <label class="f">Clé AI Horde ${k.horde ? `<span class="h">enregistrée (${esc(k.horde)})</span>` : '<span class="h">facultatif : file d\'attente plus rapide pour DreamShaper, Juggernaut, AlbedoBase et Deliberate</span>'}<input type="password" id="kHorde" autocomplete="off"></label>
+      <p class="sub">Obtenir la clé : <a href="https://aihorde.net/register" target="_blank" rel="noopener">aihorde.net/register</a> → « Sign in with Google » → nom → Submit → copier la clé. <a href="#" data-goguide="horde">Tuto pas à pas</a></p>
+      <label class="f">Jeton Hugging Face ${k.hf ? `<span class="h">enregistré (${esc(k.hf)})</span>` : '<span class="h">facultatif : peut prolonger le quota quotidien de FLUX (effet non garanti)</span>'}<input type="password" id="kHf" autocomplete="off" placeholder="hf_…"></label>
+      <p class="sub">Obtenir le jeton : <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> → Create new token → Read. <a href="#" data-goguide="hf">Tuto pas à pas</a></p>
       <div class="row"><button type="button" class="btn primary" id="saveKeys">Enregistrer</button></div></section>
     <section class="box"><h2>Lancement automatique</h2><label class="opt"><input type="checkbox" id="autoL" ${S.state.autoLaunch ? "checked" : ""}> <span>Lancer le comparatif gratuit dès la validation du résumé et à chaque dépôt de références sur un plan validé</span></label></section>`;
   $("#saveKeys").onclick = async () => {
@@ -525,6 +527,7 @@ async function renderSettings() {
     await api("POST", "/api/settings", { keys }); toast("Clés enregistrées. Le catalogue se met à jour."); renderSettings();
   };
   $("#autoL").onchange = () => api("POST", "/api/settings", { autoLaunch: $("#autoL").checked });
+  $$("[data-goguide]").forEach(a => a.onclick = async e => { e.preventDefault(); await go("guide"); const t = document.getElementById("tuto-" + a.dataset.goguide); if (t) t.scrollIntoView({ block: "start" }); });
 }
 
 /* ---------- mode d'emploi ---------- */
@@ -533,18 +536,57 @@ function renderGuide() {
   <h2>Démarrer</h2><p>Le studio est une application web : il fonctionne dans Chrome sur le téléphone comme sur l'ordinateur, <b>PC éteint compris</b>. Adresse : <a href="https://nicoqs97220.github.io/studio-360fwi/" target="_blank" rel="noopener">nicoqs97220.github.io/studio-360fwi</a>. Sur le PC, le raccourci <b>Studio 360FWI</b> du Bureau l'ouvre directement.</p>
   <p><b>Sur iPhone :</b> ouvre l'adresse dans Safari, touche Partager puis « Sur l'écran d'accueil ». <b>Sur Android :</b> dans Chrome, menu ⋮ puis « Installer l'application ». Le studio s'ouvre alors comme une application.</p>
   <p><b>Important :</b> tes projets, rendus et clés sont enregistrés <b>dans l'appareil</b> utilisé. Pour passer un projet du téléphone au PC (ou l'inverse), utilise « Exporter le projet » puis « Importer un projet exporté ». Une génération en cours continue tant que la page reste ouverte ; si tu fermes l'application, elle reprend à la réouverture.</p>
-  <h2>Créer une image, pas à pas</h2><ol>
-  <li><b>Projets</b> → crée un projet. Un premier plan est prêt.</li>
-  <li><b>01</b> Donne un titre et un objectif. Choisis image ou vidéo et le format (9:16 par défaut).</li>
-  <li><b>02</b> Dépose tes références. Chacune reçoit sa mention (@Image1, @Image2…). Indique son rôle, ce qu'elle montre, et coche « obligatoire » si un moteur doit absolument la recevoir. Touche une vignette pour la voir en pleine page, la croix × ou Échap referme.</li>
-  <li><b>03</b> Écris ou dicte ta demande avec 🎤, puis précise cadrage, lumière, contraintes.</li>
-  <li><b>04</b> « Vérifier et résumer » : le studio cherche les termes sur Wikipédia et te montre sa compréhension avec les sources. Corrige si besoin, puis « C'est bien ça ».</li>
-  <li><b>05</b> Les prompts français et chinois apparaissent. Tu peux les modifier : « Enregistrer comme nouvelle version » relance le comparatif.</li>
-  <li><b>06</b> Le comparatif part tout seul : une carte par moteur gratuit, les images arrivent au fil de l'eau. « Choisir ce résultat » te demande où l'enregistrer.</li></ol>
-  <h2>Moteurs gratuits</h2><p>Sans aucune clé : Pollinations, AI Horde (DreamShaper, Juggernaut XL, AlbedoBase XL) et FLUX.1 schnell sur Hugging Face. Avec une clé Agnes gratuite : Agnes Image et Agnes Video en plus. La page « Moteurs gratuits » montre l'état, les quotas et les conditions de chacun, avec la date du contrôle.</p>
+  <h2>Créer une image en 4 gestes</h2><ol>
+  <li><b>Accueil</b> → <b>Créer une image</b> (ou Créer une vidéo).</li>
+  <li>Écris ou dicte ta demande avec 🎤 à l'étape <b>03</b>. Ajoute des photos de référence à l'étape <b>02</b> si tu en as.</li>
+  <li><b>Vérifier ma demande</b> : le studio te dit en une phrase ce qu'il a compris. S'il a un doute, il te propose des réponses à toucher (facultatif).</li>
+  <li><b>C'est bien ça, lancer les images</b> : une carte par moteur gratuit, les images arrivent au fil de l'eau. Touche une image pour la voir en grand, puis <b>Choisir ce résultat</b> pour la télécharger ou l'ajouter à un projet.</li></ol>
+  <p>Pour une publicité complète (brief, plusieurs plans, séquencier), crée plutôt un <b>projet</b> depuis l'Accueil.</p>
+
+  <h2 id="tuto-horde">Tuto · Clé AI Horde (facultatif, gratuit)</h2>
+  <p>Avec un compte, tes demandes passent avant celles des anonymes dans la file des bénévoles : DreamShaper, Juggernaut XL, AlbedoBase XL et Deliberate répondent plus vite.</p><ol>
+  <li>Ouvre <a href="https://aihorde.net/register" target="_blank" rel="noopener">aihorde.net/register</a>.</li>
+  <li>Touche <b>Sign in with Google</b> et choisis ton compte Google (pas besoin de mot de passe en plus).</li>
+  <li>Dans <b>Display Name</b>, écris un nom, par exemple <i>NicosS360</i>, puis touche <b>Submit</b>.</li>
+  <li>La page affiche ta <b>clé API</b> (une suite de lettres et de chiffres). <b>Copie-la tout de suite</b> : elle ne se réaffiche pas. Garde-la aussi dans tes notes.</li>
+  <li>Dans le studio : <b>Réglages</b> → champ <b>Clé AI Horde</b> → colle → <b>Enregistrer</b>. Fais-le sur le téléphone et sur le PC.</li></ol>
+  <p class="sub">AI Horde est entièrement gratuit et géré par des bénévoles : n'achète jamais de « kudos » sur un autre site.</p>
+
+  <h2 id="tuto-hf">Tuto · Jeton Hugging Face (facultatif, gratuit)</h2>
+  <p>FLUX.1 schnell tourne chez Hugging Face avec un petit quota GPU quotidien. Un jeton de compte gratuit peut le prolonger ; Hugging Face ne le garantit pas pour les appels faits par un logiciel, donc ce réglage est un bonus, pas une nécessité.</p><ol>
+  <li>Ouvre <a href="https://huggingface.co/join" target="_blank" rel="noopener">huggingface.co/join</a>, crée un compte avec ton e-mail et confirme l'e-mail reçu.</li>
+  <li>Ouvre <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a>.</li>
+  <li>Touche <b>Create new token</b>, choisis l'onglet <b>Read</b>, donne un nom (<i>studio-360fwi</i>), puis <b>Create token</b>.</li>
+  <li><b>Copie</b> le jeton (il commence par <code>hf_</code>).</li>
+  <li>Dans le studio : <b>Réglages</b> → <b>Jeton Hugging Face</b> → colle → <b>Enregistrer</b>.</li></ol>
+  <p class="sub">Ne partage jamais ces clés et ne les mets pas sur GitHub : elles restent dans tes appareils.</p>
+  <h2>Moteurs gratuits</h2><p>Sans aucune clé : Pollinations, AI Horde (DreamShaper, Juggernaut XL, AlbedoBase XL, Deliberate) et FLUX.1 schnell sur Hugging Face. Avec une clé Agnes gratuite : Agnes Image et Agnes Video en plus. La page « Moteurs gratuits » montre l'état, les quotas et les conditions de chacun, avec la date du contrôle.</p>
   <h2>Le chinois et les autres moteurs</h2><p>Le prompt chinois validé part vers les moteurs qui le lisent (Agnes, puis Higgsfield plus tard). Les modèles libres (FLUX, DreamShaper…) lisent mal le chinois et ne reçoivent pas les références : ils reçoivent l'adaptation anglaise, visible dans l'étape 05 et dans « Texte et réglages envoyés » de chaque carte.</p>
   <h2>Sauvegarde</h2><p>Dans chaque projet, « Exporter le projet » télécharge un fichier qui contient tout : brief, plans, versions, prompts, références et rendus. Range ces fichiers dans un dossier de sauvegarde (par exemple <code>D:\\Studio360FWI\\Sauvegardes</code> ou ton cloud). Pour restaurer, « Importer un projet exporté » sur la page Projets.</p>
-  <h2>Ce qui viendra ensuite</h2><p>Synchronisation automatique PC ↔ téléphone, workflow vidéo complet avec timeline, dossier de rushs et montage MP4, liaison Higgsfield avec devis et confirmation.</p></article>`;
+  <h2 id="idees">Idées pour la suite (à choisir ensemble)</h2>
+  <p>Classées par utilité pour une agence qui livre des pubs et des contenus réseaux sociaux en Martinique. Dis-moi lesquelles tu veux en premier.</p>
+  <h3>1. Pour livrer des pubs prêtes à publier</h3><ul>
+  <li><b>Carton final et textes modifiables</b> par-dessus l'image : prix, offre, logo, appel à l'action. Les moteurs gratuits écrivent mal le texte ; en calques, il reste net et tu changes l'offre en 10 secondes, des semaines plus tard (ton critère de réussite).</li>
+  <li><b>Déclinaisons en un geste</b> : le même visuel en Reel/Story 9:16, post 1:1 et 4:5, bannière 16:9.</li>
+  <li><b>Kit de marque par client</b> : logo, couleurs, polices, photos produit et ton, appliqués automatiquement aux prompts et aux cartons.</li>
+  <li><b>Modèles de brief par secteur</b> : restaurant, commerce, événement, tourisme, immobilier.</li></ul>
+  <h3>2. Pour de plus belles images, sans payer</h3><ul>
+  <li><b>Agrandir en HD</b> le résultat choisi (agrandissement gratuit d'AI Horde).</li>
+  <li><b>Corriger cette image</b> : « garde tout, change seulement la couleur du maillot » (retouche ciblée avec Agnes).</li>
+  <li><b>Variantes</b> d'un résultat qui plaît, sur le même moteur.</li>
+  <li><b>Lexique martiniquais</b> : chien fer, yole ronde, madras, bèlè, accras, case créole… traduits en description visuelle juste pour chaque moteur.</li>
+  <li><b>Étoiles et classement</b> : le studio retient les moteurs qui gagnent le plus souvent et les met en premier.</li></ul>
+  <h3>3. Pour le travail de tous les jours</h3><ul>
+  <li><b>Synchronisation téléphone ↔ PC</b> automatique (aujourd'hui : export/import).</li>
+  <li><b>Personnages récurrents</b> : une égérie ou une mascotte enregistrée une fois, réutilisée dans tous les plans.</li>
+  <li><b>Lien de validation client</b> : le client voit les propositions, choisit et commente, sans compte.</li>
+  <li><b>Accueil express</b> : champ de texte et micro directement sur l'accueil.</li>
+  <li><b>Styles favoris</b> réutilisables (« soleil caraïbe 360FWI ») et historique des prompts qui ont marché.</li></ul>
+  <h3>4. Vidéo (suite du cahier des charges)</h3><ul>
+  <li><b>Storyboard vertical de 16 cases</b>, puis animation case par case.</li>
+  <li><b>Montage simple</b> dans le navigateur : clips, musique, cartons, export MP4.</li>
+  <li><b>Dossier de rushs client</b> et <b>Higgsfield</b> avec devis et confirmation.</li></ul>
+  <p><b>Ordre conseillé :</b> carton final et textes → déclinaisons → synchronisation → kit de marque → HD et retouche.</p></article>`;
 }
 
 /* ---------- démarrage ---------- */
