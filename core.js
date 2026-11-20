@@ -156,7 +156,7 @@ const Core = (() => {
         const d = await readJson(r); if (!r.ok || !d.event_id) throw errFrom(r.status, d);
         const s = await (await fetch(base + "/call/infer/" + d.event_id, { headers: auth })).text();
         const ev = [...s.matchAll(/event: (\w+)\ndata: (.*)/g)]; const last = ev[ev.length - 1];
-        if (!last || last[1] !== "complete") { const m = last ? last[2] : s.slice(0, 200); if (/quota|GPU|exceeded/i.test(m)) throw new EngineError("Quota GPU gratuit épuisé pour aujourd'hui" + (settings.keys.hf ? "" : " (un jeton Hugging Face gratuit l'augmente)"), "quota atteint"); throw new EngineError("Le Space a répondu : " + String(m).slice(0, 200)); }
+        if (!last || last[1] !== "complete") { const m = last ? last[2] : s.slice(0, 200); if (/quota|GPU|exceeded/i.test(m) || (last && last[1] === "error" && /^\s*null\s*$/.test(m))) throw new EngineError("Quota GPU gratuit épuisé pour aujourd'hui" + (settings.keys.hf ? "" : " (un jeton Hugging Face gratuit l'augmente)"), "quota atteint"); throw new EngineError("Le Space a répondu : " + String(m).slice(0, 200)); }
         const url = (last[2].match(/"url":\s*"([^"]+)"/) || [])[1]; if (!url) throw new EngineError("Pas d'image dans la réponse");
         const img = await fetch(url, { headers: auth }); if (!img.ok) throw new EngineError("Téléchargement du résultat impossible");
         return ctx.saveBlob(await img.blob(), "webp");
