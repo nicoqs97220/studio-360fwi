@@ -3,7 +3,7 @@
    Remplace le serveur : stockage (IndexedDB), catalogue, moteurs gratuits, lots, versions.
    Tout reste sur l'appareil ; seuls les textes et références d'un plan partent vers les moteurs choisis. */
 const Core = (() => {
-  const VERSION = "0.2.0";
+  const VERSION = "0.2.1";
   const CA = { "Client-Agent": "Studio360FWI:0.2:web" };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const now = () => new Date().toISOString();
@@ -226,6 +226,13 @@ const Core = (() => {
 
   /* ---------- texte et recherche ---------- */
   const cleanTxt = t => String(t || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  const arr = x => Array.isArray(x) ? x : [];
+  function parseJson(t) {
+    const s = String(t || "").replace(/```(?:json)?/gi, "");
+    const a = s.indexOf("{"), z = s.lastIndexOf("}");
+    if (a < 0 || z <= a) throw new Error("réponse non structurée");
+    return JSON.parse(s.slice(a, z + 1));
+  }
   async function llm(messages) {
     if (settings.keys.agnes) { const d = await agnes("/v1/chat/completions", { model: "agnes-3.0-flash", messages }); return { text: cleanTxt(d.choices[0].message.content), via: "Agnes 3.0 Flash" }; }
     return lanes.pollTxt.run(async () => {
@@ -407,18 +414,38 @@ const Core = (() => {
     if (b.skipWeb) pl.research = { text: pl.description, queries: [], sources: [], date: now(), status: "ignorée", error: null };
     else { try { pl.research = { text: pl.description, ...(await research(pl.description)), date: now(), status: "ok", error: null }; } catch (e) { pl.research = { text: pl.description, queries: [], sources: [], date: now(), status: "indisponible", error: String(e.message || e) }; save(p); return { project: await out(p), webError: pl.research.error }; } }
     const src = (pl.research.sources || []).map((s, i) => `[${i + 1}] ${s.title} — ${s.extract}`).join("\n") || "aucune source trouvée";
-    const s = await llm([{ role: "system", content: "Tu aides un créateur martiniquais à vérifier sa demande avant une génération d'image ou de vidéo. Réponds en français, en 3 à 6 phrases courtes, en le tutoyant. Commence par « Tu veux… ». Dis ce que tu as identifié grâce aux sources (cite [1], [2]), puis le lieu, le cadrage ou le format s'ils sont précisés, puis ce qui reste à son choix. Sépare les faits vérifiés des propositions artistiques. Si un doute changerait l'image, termine par une seule question de clarification. N'invente aucun fait." }, { role: "user", content: planContext(p, pl) + "\n\nSources Web :\n" + src }]);
-    pl.summary = { text: s.text, status: "à valider", via: s.via, date: now() }; save(p); return { project: await out(p) };
+    let sum;
+    try {
+      const s = await llm([{ role: "system", content: "Tu vérifies la demande d'un créateur avant une génération d'image ou de vidéo. Rends UNIQUEMENT un objet JSON, sans texte autour : {\"comprehension\":\"…\",\"faits\":[\"…\"],\"questions\":[{\"question\":\"…\",\"choix\":[\"…\",\"…\"]}]}. comprehension : UNE ou DEUX phrases simples en français, en tutoyant, qui commencent par « Tu veux » et reprennent seulement ce qu'il a demandé. faits : 0 à 3 faits très courts tirés des sources, avec leur numéro [1], UNIQUEMENT pour des noms propres, des termes locaux ou régionaux, des marques ou des mots rares qu'un moteur pourrait mal comprendre ; jamais la définition d'un mot courant (femme, plage, tabouret…) : dans ce cas, liste vide. questions : 0 à 3 questions courtes, seulement si la réponse change vraiment l'image ; chaque question propose 2 à 4 choix de 1 à 4 mots. Aucune question sur ce qui est déjà précisé. N'invente aucun fait." }, { role: "user", content: planContext(p, pl) + "\n\nSources Web :\n" + src }]);
+      const j = parseJson(s.text);
+      sum = { text: String(j.comprehension || "").trim() || ("Tu veux : " + pl.description), facts: arr(j.faits).slice(0, 3).map(String),
+        questions: arr(j.questions).filter(q => q && q.question).slice(0, 3).map(q => ({ question: String(q.question), choix: arr(q.choix).slice(0, 4).map(String) })), via: s.via };
+    } catch (e) {
+      sum = { text: "Tu veux : " + pl.description, facts: [], questions: [], via: "sans IA (service de texte indisponible)" };
+    }
+    pl.answers = [];
+    pl.summary = { ...sum, status: "à valider", date: now() }; save(p); return { project: await out(p) };
   });
   on("POST", /^\/api\/projects\/(\w+)\/plans\/(\w+)\/validate$/, async (b, m) => {
     const p = getP(m[1]); const pl = getPl(p, m[2]); if (typeof b.summary === "string") pl.summary.text = b.summary;
+    if (Array.isArray(b.answers)) pl.answers = b.answers.filter(a => a && String(a.answer || "").trim()).map(a => ({ question: String(a.question), answer: String(a.answer).trim() }));
     pl.summary.status = "validé"; pl.summary.validatedAt = now();
     const long = pl.mode === "video" ? "Pour la vidéo, le chinois ne dépasse pas 2 500 caractères (préférence Kling) et suit la timeline." : "";
     const src = (pl.research && pl.research.sources || []).map(s => `${s.title} : ${s.extract}`).join("\n");
-    const r = await llm([{ role: "system", content: (src ? "Faits vérifiés sur le Web :\n" + src + "\n\n" : "") + "Tu écris des prompts de génération. Rends UNIQUEMENT un objet JSON {\"fr\":\"…\",\"zh\":\"…\",\"en\":\"…\"}. fr et zh décrivent exactement le même plan, dans le même ordre : sujet, action, cadrage, position de caméra, lumière, décor, contraintes. N'utilise QUE les mentions listées dans « Références dans l'ordre d'envoi » (@Image1, @Video1…), à chaque action concernée, à l'identique dans fr et zh ; s'il n'y a aucune référence, n'écris aucune mention @. Ne commence pas par « Plan 1 » et n'invente ni race, ni couleur, ni détail absent de la demande, du résumé ou des sources. zh est en chinois simplifié et traduit fidèlement les noms locaux (ex. « chien fer » : chien martiniquais à peau nue, pas un « chien de fête »). en est une adaptation anglaise pour les moteurs qui ne lisent ni le chinois ni les références : aucune mention @, décris en mots ce que montrent les références, 900 caractères maximum. Les paramètres techniques (format, durée) ne vont pas dans les prompts. " + long }, { role: "user", content: planContext(p, pl) + "\n\nRésumé validé :\n" + pl.summary.text }]);
-    const mm = r.text.match(/\{[\s\S]*\}/); if (!mm) throw new HttpErr("Le service de texte n'a pas rendu de prompts lisibles. Réessaie.", 502);
-    let j; try { j = JSON.parse(mm[0]); } catch { throw new HttpErr("Prompts illisibles, réessaie.", 502); }
-    pl.promptFr = String(j.fr || "").trim(); pl.promptZh = String(j.zh || "").trim(); pl.promptEn = String(j.en || "").trim(); pl.promptsVia = r.via; pl.state = "validé";
+    const ans = (pl.answers || []).map(a => `- ${a.question} → ${a.answer}`).join("\n") || "aucune";
+    let pr = null, why = "";
+    // Deux essais de rédaction ; en cas d'échec, la génération part quand même avec la description telle quelle.
+    for (let i = 0; i < 2 && !pr; i++) {
+      try {
+        const r = await llm([{ role: "system", content: (src ? "Faits vérifiés sur le Web :\n" + src + "\n\n" : "") + "Tu écris des prompts de génération d'image ou de vidéo. Rends UNIQUEMENT un objet JSON, sans texte autour : {\"fr\":\"…\",\"zh\":\"…\",\"en\":\"…\"}. Un prompt DÉCRIT l'image en une ou deux phrases fluides : sujet, action, décor, et seulement si c'est précisé, cadrage, caméra, lumière, style. Il ne contient JAMAIS de question, d'option, de « à préciser », de « proposition » ni de liste de choix : ce qui n'est pas précisé est simplement omis. fr et zh décrivent exactement la même image. N'utilise QUE les mentions listées dans « Références dans l'ordre d'envoi » (@Image1…), à l'identique dans fr et zh ; sans référence, aucune mention @. N'invente ni race, ni couleur, ni détail absent de la demande, des précisions ou des faits. zh est en chinois simplifié et traduit fidèlement les noms locaux (ex. « chien fer » : chien martiniquais à peau nue). en est l'adaptation anglaise pour les moteurs qui ne lisent pas le chinois : aucune mention @, 600 caractères maximum. Le format et la durée ne vont pas dans les prompts. " + long },
+          { role: "user", content: planContext(p, pl) + "\n\nCe qu'il veut (validé) :\n" + pl.summary.text + "\n\nPrécisions choisies :\n" + ans }]);
+        const j = parseJson(r.text);
+        if (!String(j.fr || j.en || "").trim()) throw new Error("prompts vides");
+        pr = { fr: String(j.fr || "").trim(), zh: String(j.zh || "").trim(), en: String(j.en || "").trim(), via: r.via };
+      } catch (e) { why = String(e.message || e); }
+    }
+    if (!pr) { const base = [pl.description, ...(pl.answers || []).map(a => a.answer)].filter(Boolean).join(", "); pr = { fr: base, zh: "", en: base, via: "sans IA : ta description telle quelle (service de texte indisponible)" }; }
+    pl.promptFr = pr.fr; pl.promptZh = pr.zh; pl.promptEn = pr.en; pl.promptsVia = pr.via; pl.state = "validé";
     snapshot(pl, "Résumé validé"); let lot = null; if (settings.autoLaunch && !pl.hold && !b.hold) lot = createLot(p, pl);
     save(p); return { project: await out(p), lotId: lot && lot.id };
   });

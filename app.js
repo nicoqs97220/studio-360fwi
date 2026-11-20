@@ -276,19 +276,35 @@ function renderMic() {
 function renderUnderstand() {
   const pl = plan(); const box = $("#stepUnderstand"); const r = pl.research;
   const validated = pl.summary.status === "validé";
-  box.innerHTML = `<header><span class="n">04</span><h2>Vérifier et valider la demande</h2><p class="sub">Le studio cherche les termes précis sur Wikipédia, puis te présente sa compréhension. Rien n'est envoyé aux générateurs avant ta validation.</p></header>
-    <div class="row"><button type="button" class="btn primary" id="btnUnderstand">${pl.summary.text ? "Relancer la vérification" : "Vérifier et résumer"}</button>
-    <label class="sub"><input type="checkbox" id="holdLaunch" ${pl.hold ? "checked" : ""}> Attendre avant de lancer le comparatif</label></div>
+  const what = pl.mode === "video" ? "la vidéo" : "les images";
+  const qs = pl.summary.questions || [];
+  const chosen = Object.fromEntries((pl.answers || []).map(a => [a.question, a.answer]));
+  box.innerHTML = `<header><span class="n">04</span><h2>Vérifier ma demande</h2><p class="sub">Le studio vérifie les mots importants sur Wikipédia et te dit ce qu'il a compris. Ensuite, un seul bouton lance ${what}.</p></header>
+    <div class="row"><button type="button" class="btn ${pl.summary.text ? "" : "primary"}" id="btnUnderstand">${pl.summary.text ? "Revérifier après une correction" : "Vérifier ma demande"}</button></div>
     ${r && r.status === "indisponible" ? `<div class="summary" style="background:var(--warn-soft)"><b>Recherche Web indisponible</b><span class="sub">${esc(r.error)}</span>
-      <div class="row"><button type="button" class="btn small" id="webRetry">Réessayer</button><button type="button" class="btn small" id="webSkip">Poursuivre avec mes informations</button></div></div>` : ""}
-    ${r && r.sources && r.sources.length ? `<div><h3>Sources consultées <span class="sub">(${fmtDate(r.date)} · recherches : ${esc(r.queries.join(" ; "))})</span></h3><ol class="sources">${r.sources.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> — ${esc(s.extract.slice(0, 220))}</li>`).join("")}</ol></div>` : r && r.status === "ok" ? `<p class="sub">Aucune source trouvée pour « ${esc(r.text)} ». Le résumé repose sur ta description.</p>` : ""}
-    ${pl.summary.text ? `<div class="summary"><div class="row between"><h3>Ce que le studio a compris</h3>${statusChip(validated ? "validé" : "à valider")}</div>
-      <textarea id="sumText" rows="5">${esc(pl.summary.text)}</textarea>
-      <span class="sub">Rédigé par ${esc(pl.summary.via || "—")} · tu peux corriger le texte directement.</span>
-      <div class="row"><button type="button" class="btn primary" id="btnOk">C'est bien ça</button><button type="button" class="btn" id="btnFix">Corriger</button></div></div>` : ""}`;
-  $("#holdLaunch").onchange = () => patchPlan({ hold: $("#holdLaunch").checked });
+      <div class="row"><button type="button" class="btn small" id="webRetry">Réessayer</button><button type="button" class="btn small" id="webSkip">Continuer sans recherche</button></div></div>` : ""}
+    ${pl.summary.text ? `<div class="summary">
+      <div class="row between"><h3>J'ai compris</h3>${statusChip(validated ? "validé" : "à valider")}</div>
+      <p class="understood">${esc(pl.summary.text)}</p>
+      ${(pl.summary.facts || []).length ? `<ul class="facts">${pl.summary.facts.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
+      ${qs.length ? `<div class="qs"><h3>Tu veux préciser ? <span class="sub">Facultatif : sans réponse, les moteurs choisissent librement.</span></h3>
+        ${qs.map((q, i) => `<fieldset class="q" data-q="${i}"><legend>${esc(q.question)}</legend><div class="choices">
+          ${q.choix.map(c => `<button type="button" class="choice" data-qi="${i}" data-val="${esc(c)}" aria-pressed="${chosen[q.question] === c}">${esc(c)}</button>`).join("")}
+          <input type="text" class="other" data-qo="${i}" placeholder="Autre…" value="${esc(chosen[q.question] && !q.choix.includes(chosen[q.question]) ? chosen[q.question] : "")}"></div></fieldset>`).join("")}</div>` : ""}
+      <div class="row"><button type="button" class="btn primary big" id="btnOk">${validated ? "Relancer " + what : "C'est bien ça, lancer " + what}</button><button type="button" class="btn" id="btnFix">Corriger ma description</button></div>
+      <label class="sub"><input type="checkbox" id="holdLaunch" ${pl.hold ? "checked" : ""}> Préparer les prompts sans lancer tout de suite</label>
+      ${r && r.sources && r.sources.length ? `<details><summary class="sub">Sources vérifiées (${r.sources.length})</summary><ol class="sources">${r.sources.map(s => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> — ${esc(s.extract.slice(0, 200))}</li>`).join("")}</ol></details>` : ""}
+      <span class="sub">Compréhension rédigée par ${esc(pl.summary.via || "—")}.</span></div>` : ""}`;
+  if ($("#holdLaunch")) $("#holdLaunch").onchange = () => patchPlan({ hold: $("#holdLaunch").checked });
+  $$(".choice", box).forEach(b => b.onclick = () => {
+    const i = b.dataset.qi; const on = b.getAttribute("aria-pressed") !== "true";
+    $$(`.choice[data-qi="${i}"]`, box).forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", String(on));
+    if (on) $(`[data-qo="${i}"]`, box).value = "";
+  });
+  $$(".other", box).forEach(inp => inp.oninput = () => { if (inp.value.trim()) $$(`.choice[data-qi="${inp.dataset.qo}"]`, box).forEach(x => x.setAttribute("aria-pressed", "false")); });
+  const answers = () => qs.map((q, i) => { const sel = $(`.choice[data-qi="${i}"][aria-pressed="true"]`, box); const other = $(`[data-qo="${i}"]`, box).value.trim(); return { question: q.question, answer: other || (sel ? sel.dataset.val : "") }; }).filter(a => a.answer);
   const understand = async (skipWeb) => {
-    const b = $("#btnUnderstand"); b.disabled = true; b.textContent = "Recherche et résumé en cours… (jusqu'à 1 min sans clé Agnes)";
+    const b = $("#btnUnderstand"); b.disabled = true; b.textContent = "Vérification en cours… (jusqu'à 1 min sans clé Agnes)";
     try { const d = await api("POST", planUrl("/understand"), { description: $("#f_description").value, skipWeb }); S.project = d.project; if (d.webError) toast("Recherche Web indisponible."); }
     catch (e) { toast(e.message); }
     renderUnderstand();
@@ -296,14 +312,14 @@ function renderUnderstand() {
   $("#btnUnderstand").onclick = () => understand(false);
   if ($("#webRetry")) $("#webRetry").onclick = () => understand(false);
   if ($("#webSkip")) $("#webSkip").onclick = () => understand(true);
-  if ($("#btnFix")) $("#btnFix").onclick = () => { const ta = $("#f_description"); ta.focus(); ta.scrollIntoView({ block: "center" }); toast("Corrige ta demande, puis relance la vérification."); };
+  if ($("#btnFix")) $("#btnFix").onclick = () => { const ta = $("#f_description"); ta.focus(); ta.scrollIntoView({ block: "center" }); toast("Corrige ta description, puis « Revérifier après une correction »."); };
   if ($("#btnOk")) $("#btnOk").onclick = async () => {
-    const b = $("#btnOk"); b.disabled = true; b.textContent = "Rédaction des prompts FR et chinois…";
+    const b = $("#btnOk"); b.disabled = true; b.textContent = "Préparation, puis lancement… (jusqu'à 1 min sans clé Agnes)";
     try {
-      const d = await api("POST", planUrl("/validate"), { summary: $("#sumText").value, hold: $("#holdLaunch").checked });
-      S.project = d.project; toast(d.lotId ? "Résumé validé. Prompts prêts, comparatif gratuit lancé." : "Résumé validé. Prompts prêts.");
+      const d = await api("POST", planUrl("/validate"), { answers: answers(), hold: $("#holdLaunch") ? $("#holdLaunch").checked : false });
+      S.project = d.project; toast(d.lotId ? "C'est parti : les résultats arrivent au fil de l'eau." : "Prompts prêts. Lance le comparatif quand tu veux.");
       renderPlans(); $("#stepCompare").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) { toast(e.message); b.disabled = false; b.textContent = "C'est bien ça"; }
+    } catch (e) { toast(e.message); b.disabled = false; b.textContent = "C'est bien ça, lancer " + what; }
   };
 }
 
@@ -312,7 +328,8 @@ function renderPrompts() {
   const pl = plan(); const box = $("#stepPrompts");
   const lim = pl.mode === "video" ? 2500 : null;
   const cnt = (t) => `<span class="count ${lim && t.length > lim ? "over" : ""}">${t.length} caractères${lim ? " / " + lim + " (Kling)" : ""}</span>`;
-  box.innerHTML = `<header><span class="n">05</span><h2>Prompts français et chinois</h2><p class="sub">Le français sert à la relecture, le chinois à l'envoi. Les deux décrivent le même plan avec les mêmes mentions. ${pl.promptsVia ? "Rédigés par " + esc(pl.promptsVia) + "." : ""}</p></header>
+  box.innerHTML = `<details class="pdet"><summary><span class="n">05</span> <b>Prompts envoyés</b> <span class="sub">— français, chinois et adaptation anglaise ; à ouvrir seulement si tu veux les retoucher</span></summary>
+    <p class="sub">Le français sert à la relecture, le chinois à l'envoi. ${pl.promptsVia ? "Rédigés par " + esc(pl.promptsVia) + "." : ""}</p>
     ${pl.promptFr || pl.promptZh ? `<div class="prompts">
       <label class="f"><span class="row between">Français ${cnt(pl.promptFr)}</span><textarea id="pFr">${esc(pl.promptFr)}</textarea><button type="button" class="btn small" data-copy="pFr">Copier</button></label>
       <label class="f"><span class="row between">中文 · chinois ${cnt(pl.promptZh)}</span><textarea id="pZh">${esc(pl.promptZh)}</textarea><button type="button" class="btn small" data-copy="pZh">Copier</button></label></div>
@@ -320,7 +337,7 @@ function renderPrompts() {
       <details class="en"><summary>Adaptation anglaise envoyée aux moteurs qui ne lisent pas le chinois</summary><textarea id="pEn" class="mono" style="margin-top:8px">${esc(pl.promptEn)}</textarea>
       <p class="sub">FLUX, DreamShaper, Juggernaut et les autres modèles libres comprennent mal le chinois et ne reçoivent pas les références : ils lisent cette version.</p></details>
       <div class="row"><button type="button" class="btn" id="saveVersion">Enregistrer comme nouvelle version et relancer le comparatif</button></div>`
-    : `<div class="empty">Les prompts apparaîtront après « C'est bien ça » à l'étape 04.</div>`}`;
+    : `<div class="empty">Les prompts apparaîtront après « C'est bien ça » à l'étape 04.</div>`}</details>`;
   $$("[data-copy]").forEach(b => b.onclick = e => { e.preventDefault(); copy($("#" + b.dataset.copy).value, "Prompt copié."); });
   const save = debounce(async () => { await patchPlan({ promptFr: $("#pFr").value, promptZh: $("#pZh").value, promptEn: $("#pEn").value }); }, 500);
   $$("#pFr,#pZh,#pEn").forEach(t => t.oninput = save);
