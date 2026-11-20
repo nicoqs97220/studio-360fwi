@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0f6e5f"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#d8ede8" stroke-width="22" stroke-dasharray="700 242" transform="rotate(-60 256 256)"/>
+  <text x="256" y="292" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="700" fill="#ffffff">360</text>
+</svg>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Studio 360FWI</title>
+<meta name="description" content="Studio de création 360FWI : brief, plans, références, prompts français et chinois, comparatif de générateurs gratuits.">
+<meta name="theme-color" content="#0f6e5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="360FWI">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="logo">360FWI<small>Studio de création</small></div>
+    <nav class="main" aria-label="Sections">
+      <button type="button" data-view="home">Accueil</button>
+      <button type="button" data-quick="image">Créer une image</button>
+      <button type="button" data-quick="video">Créer une vidéo</button>
+      <button type="button" data-view="catalog">Moteurs gratuits</button>
+      <button type="button" data-view="settings">Réglages</button>
+      <button type="button" data-view="guide">Mode d'emploi</button>
+    </nav>
+    <div class="foot" id="foot"></div>
+  </aside>
+  <main id="main" aria-live="polite"><div class="empty">Ouverture du studio…</div></main>
+</div>
+
+<div id="viewer" hidden role="dialog" aria-modal="true" aria-label="Aperçu en pleine page">
+  <div class="top"><span class="cap" id="viewerCap"></span><button type="button" class="x" id="viewerClose" aria-label="Fermer l'aperçu">×</button></div>
+  <div class="stage" id="viewerStage"></div>
+</div>
+
+<dialog id="chooseDlg">
+  <form method="dialog" id="chooseForm">
+    <h2>Où veux-tu enregistrer cette création ?</h2>
+    <label class="opt"><input type="checkbox" id="chDevice" checked> <span><b>Enregistrer sur cet appareil</b><br><span class="sub">Téléchargement du fichier original.</span></span></label>
+    <label class="opt"><input type="checkbox" id="chPlan" checked> <span><b>Garder comme choix de cette création</b><br><span class="sub">La vignette reprend ce résultat.</span></span></label>
+    <label class="opt"><input type="checkbox" id="chFolder"> <span><b>Ajouter à un projet</b><br><span class="sub">Avec son prompt, son moteur et ses références.</span></span></label>
+    <div class="grid2" id="chFolderRow">
+      <label class="f">Projet<select id="chProject"></select></label>
+      <label class="f" id="chNewProjWrap" hidden>Nom du nouveau projet<input type="text" id="chNewProj" placeholder="Ex. Pub La Boudinière"></label>
+      <label class="f">Dossier<input type="text" id="chFolderName" list="chFolderList" value="Sélection"><datalist id="chFolderList"></datalist></label>
+    </div>
+    <div class="row">
+      <button class="btn primary" value="ok" id="chOk">Enregistrer</button>
+      <button class="btn ghost" value="cancel">Annuler</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="planche"></div>
+<div id="toast" role="status" hidden></div>
+<script src="./core.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
